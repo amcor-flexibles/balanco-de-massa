@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Amcor · Balanço de Massa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; font-family: 'Barlow', sans-serif; background: #0d1520; color: #fff; }
+  input[type=number]::-webkit-inner-spin-button { opacity: .3; }
+  input[type=text], input[type=number] { font-family: 'Barlow Condensed', sans-serif; }
+  button { cursor: pointer; font-family: 'Barlow Condensed', sans-serif; }
+
+  /* PDF snapshot: força dimensões exatas do A4 landscape em mm→px a 96dpi */
+  .pdf-snapshot {
+    width: 1122px !important;
+    max-width: 1122px !important;
+    min-width: 1122px !important;
+    height: 794px !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* ---------- LOGO ---------- */
+  .logo { font-family: sans-serif; font-style: italic; font-weight: bold; color: #fff; letter-spacing: -.02em; line-height: 1; display: inline-block; }
+
+  /* ---------- SCREEN ---------- */
+  .screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+  .screen.hidden { display: none; }
+
+  /* ---------- GRADIENT BACKGROUNDS ---------- */
+  .bg-blue  { background: linear-gradient(160deg,#002B49 0%,#0067B1 50%,#009CDE 100%); }
+  .bg-dark  { background: #0d1520; }
+
+  /* ---------- PROGRESS BAR ---------- */
+  .pbar-wrap { background: rgba(255,255,255,.15); border-radius: 99px; height: 6px; overflow: hidden; }
+  .pbar-fill  { height: 100%; border-radius: 99px; transition: width .5s ease; }
+
+  /* ---------- CALCULADORA ---------- */
+  #calc-fab-wrap {
+    position: fixed; bottom: 28px; right: 28px; z-index: 800;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  #calc-fab-wrap.hidden { display: none; }
+
+  #calc-fab-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: .72rem; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: #fff;
+    text-shadow: 0 1px 6px rgba(0,0,0,.7), 0 0px 2px rgba(0,0,0,.9);
+    pointer-events: none; user-select: none;
+  }
+
+  #calc-fab {
+    width: 52px; height: 52px; border-radius: 16px;
+    background: linear-gradient(135deg,#0067B1,#009CDE);
+    border: none; box-shadow: 0 6px 24px rgba(0,103,177,.45);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform .2s, box-shadow .2s;
+  }
+  #calc-fab:hover { transform: scale(1.08); box-shadow: 0 10px 32px rgba(0,103,177,.55); }
+  #calc-fab svg { width: 26px; height: 26px; fill: #fff; }
+
+  #calc-panel {
+    position: fixed; bottom: 92px; right: 28px; z-index: 810;
+    width: 240px; background: #0d1e30;
+    border: 1px solid rgba(0,156,222,.35); border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+    overflow: hidden;
+    transform: scale(.85) translateY(20px); transform-origin: bottom right;
+    opacity: 0; pointer-events: none;
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s;
+  }
+  #calc-panel.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: all; }
+  #calc-panel.hidden { display: none; }
+
+  .calc-display {
+    background: rgba(0,0,0,.35); padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .calc-expr { font-family: 'Barlow Condensed',sans-serif; font-size: .75rem; color: rgba(255,255,255,.35); min-height: 16px; text-align: right; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .calc-val  { font-family: 'Barlow Condensed',sans-serif; font-size: 1.8rem; font-weight: 900; color: #fff; text-align: right; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .calc-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: rgba(255,255,255,.05); }
+  .calc-btn {
+    background: #0d1e30; border: none; color: #fff; padding: 0;
+    height: 52px; font-family: 'Barlow Condensed',sans-serif; font-size: 1.05rem; font-weight: 700;
+    cursor: pointer; transition: background .12s, color .12s;
+  }
+  .calc-btn:active { background: rgba(0,156,222,.25); }
+  .calc-btn.op    { color: #009CDE; }
+  .calc-btn.clear { color: #FF8A7A; }
+  .calc-btn.eq    { background: linear-gradient(135deg,#0067B1,#009CDE); color: #fff; }
+  .calc-btn.eq:active { background: #005fa3; }
+  .calc-btn.zero  { grid-column: span 2; }
+
+  /* ---------- TOAST ---------- */
+  #toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+    border-radius: 12px; padding: 14px 24px; font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.05rem; font-weight: 700; letter-spacing: .04em; z-index: 999;
+    box-shadow: 0 8px 30px rgba(0,0,0,.3); display: flex; align-items: center; gap: 10;
+    opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- COIN BURST ---------- */
+  #burst {
+    position: fixed; top: 40%; left: 50%; transform: translate(-50%,-50%);
+    pointer-events: none; z-index: 1000;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 3rem; font-weight: 900;
+    color: #FFD700; text-shadow: 0 2px 20px rgba(0,0,0,.4);
+    opacity: 0; transition: none;
+  }
+  @keyframes burst { 0%{opacity:1;transform:translate(-50%,-50%) scale(1)} 50%{opacity:1;transform:translate(-50%,-70%) scale(1.3)} 100%{opacity:0;transform:translate(-50%,-90%) scale(1)} }
+
+  /* ---------- GENERIC CARDS ---------- */
+  .card { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 16px; padding: 20px; margin-bottom: 14px; }
+  .card-title { font-family: 'Barlow Condensed', sans-serif; font-size: .72rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.4); margin-bottom: 8px; }
+  .zone-pill { font-family: 'Barlow Condensed', sans-serif; font-size: .75rem; font-weight: 700; border-radius: 6px; padding: 3px 8px; border: 1px solid; }
+  .btn-primary { border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; padding: 14px; color: #fff; width: 100%; }
+  .btn-next { background: #008A5E; }
+  .input-calc { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2); border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 1.4rem; font-weight: 700; outline: none; width: 100%; }
+  .input-calc:disabled { opacity: .6; }
+
+  /* ---------- CERTIFICATE ---------- */
+  #cert-wrap { width: 100%; max-width: 780px; background: white; border-radius: 4px; box-shadow: 0 30px 80px rgba(0,0,0,.4); overflow: hidden; position: relative; color: #333; }
+  #cert-wrap * { font-family: 'Barlow', sans-serif; }
+  .cert-accent { height: 10px; background: linear-gradient(90deg,#002B49,#0067B1,#009CDE); }
+  .cert-accent-sm { height: 6px; background: linear-gradient(90deg,#002B49,#0067B1,#009CDE); }
+  .cert-frame { margin: 20px; border: 2px solid #C4A747; padding: 32px 40px; position: relative; }
+  .cert-corner { position: absolute; width: 20px; height: 20px; }
+  .cert-corner.tl { top:-2px; left:-2px; border-top:3px solid #C4A747; border-left:3px solid #C4A747; }
+  .cert-corner.tr { top:-2px; right:-2px; border-top:3px solid #C4A747; border-right:3px solid #C4A747; }
+  .cert-corner.bl { bottom:-2px; left:-2px; border-bottom:3px solid #C4A747; border-left:3px solid #C4A747; }
+  .cert-corner.br { bottom:-2px; right:-2px; border-bottom:3px solid #C4A747; border-right:3px solid #C4A747; }
+  .cert-divider { display: flex; align-items: center; gap: 16px; margin: 20px 0; }
+  .cert-divider-line { flex: 1; height: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ══════ CALCULADORA ══════ -->
+<div id="calc-fab-wrap" class="hidden">
+  <span id="calc-fab-label">Calculadora</span>
+  <button id="calc-fab" onclick="toggleCalc()" title="Calculadora">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="18" height="18" rx="3" ry="3" fill="none" stroke="#fff" stroke-width="1.6"/>
+      <rect x="6" y="6" width="12" height="3.5" rx="1.2" fill="#fff" opacity=".85"/>
+      <circle cx="7.2" cy="13" r="1.1" fill="#fff"/>
+      <circle cx="12" cy="13" r="1.1" fill="#fff"/>
+      <circle cx="16.8" cy="13" r="1.1" fill="#fff"/>
+      <circle cx="7.2" cy="17" r="1.1" fill="#fff"/>
+      <circle cx="12" cy="17" r="1.1" fill="#fff"/>
+      <rect x="15.4" y="15.6" width="2.8" height="2.8" rx=".7" fill="#FFD700"/>
+    </svg>
+  </button>
+</div>
+<div id="calc-panel" class="hidden">
+  <div class="calc-display">
+    <div class="calc-expr" id="calc-expr"></div>
+    <div class="calc-val"  id="calc-val">0</div>
+  </div>
+  <div class="calc-grid">
+    <button class="calc-btn clear" onclick="calcInput('C')">C</button>
+    <button class="calc-btn op"    onclick="calcInput('±')">±</button>
+    <button class="calc-btn op"    onclick="calcInput('%')">%</button>
+    <button class="calc-btn op"    onclick="calcInput('/')">÷</button>
+
+    <button class="calc-btn" onclick="calcInput('7')">7</button>
+    <button class="calc-btn" onclick="calcInput('8')">8</button>
+    <button class="calc-btn" onclick="calcInput('9')">9</button>
+    <button class="calc-btn op" onclick="calcInput('*')">×</button>
+
+    <button class="calc-btn" onclick="calcInput('4')">4</button>
+    <button class="calc-btn" onclick="calcInput('5')">5</button>
+    <button class="calc-btn" onclick="calcInput('6')">6</button>
+    <button class="calc-btn op" onclick="calcInput('-')">−</button>
+
+    <button class="calc-btn" onclick="calcInput('1')">1</button>
+    <button class="calc-btn" onclick="calcInput('2')">2</button>
+    <button class="calc-btn" onclick="calcInput('3')">3</button>
+    <button class="calc-btn op" onclick="calcInput('+')">+</button>
+
+    <button class="calc-btn zero" onclick="calcInput('0')">0</button>
+    <button class="calc-btn" onclick="calcInput('.')">.</button>
+    <button class="calc-btn eq"  onclick="calcInput('=')">=</button>
+  </div>
+</div>
+
+<!-- ══════ TOAST & BURST ══════ -->
+<div id="toast"></div>
+<div id="burst"></div>
+
+<!-- ══════════════════════════════════════
+     SCREEN: NAME
+══════════════════════════════════════ -->
+<div id="scr-name" class="screen bg-blue">
+  <div style="text-align:center;max-width:480px;width:100%">
+    <span class="logo" style="font-size:3.5rem">amcor</span>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.25em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:20px 0 8px">Flexibles · Treinamento Operacional</div>
+    <h1 style="font-family:'Barlow Condensed',sans-serif;font-size:clamp(2.4rem,7vw,3.8rem);font-weight:900;text-transform:uppercase;color:#fff;line-height:1;letter-spacing:-.02em;margin:12px 0 28px">Balanço de<br><span style="color:#009CDE">Massa</span></h1>
+    <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:28px 24px;margin-bottom:24px">
+      <label style="display:block;font-family:'Barlow Condensed',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:12px">Antes de começar, qual é o seu nome?</label>
+      <input id="inp-name" type="text" placeholder="Digite seu nome completo" autocomplete="off"
+        style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:14px 16px;color:#fff;font-size:1.1rem;outline:none" />
+    </div>
+    <button id="btn-name-go" onclick="nameConfirm()"
+      style="background:rgba(255,255,255,.15);color:rgba(255,255,255,.3);border:none;border-radius:12px;font-size:1.3rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:16px 48px;transition:all .2s">
+      ▶ Iniciar Treinamento
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN: HOME
+══════════════════════════════════════ -->
+<div id="scr-home" class="screen bg-blue hidden">
+  <div style="text-align:center;max-width:520px">
+    <span class="logo" style="font-size:4rem">amcor</span>
+    <div style="margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.25em;text-transform:uppercase;color:rgba(255,255,255,.55)">Flexibles · Treinamento Operacional</div>
+    <h1 style="font-family:'Barlow Condensed',sans-serif;font-size:clamp(2.8rem,8vw,4.5rem);font-weight:900;text-transform:uppercase;color:#fff;line-height:.95;letter-spacing:-.02em;margin:16px 0">Balanço<br>de<br><span style="color:#009CDE">Massa</span></h1>
+    <p id="home-greet" style="color:rgba(255,255,255,.6);font-size:1rem;margin-bottom:20px"></p>
+    <div id="home-stats" style="display:none;background:rgba(255,255,255,.1);border-radius:12px;padding:12px 20px;margin-bottom:24px;justify-content:center;gap:24px">
+      <div style="text-align:center">
+        <div id="home-score" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900;color:#FFD700"></div>
+        <div style="font-size:.75rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em">pontos</div>
+      </div>
+      <div style="width:1px;background:rgba(255,255,255,.15)"></div>
+      <div style="text-align:center">
+        <div id="home-lvls" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900;color:#009CDE"></div>
+        <div style="font-size:.75rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em">fases</div>
+      </div>
+    </div>
+    <button onclick="startGame()"
+      style="background:#009CDE;color:#002B49;border:none;border-radius:12px;font-size:1.3rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:16px 48px;box-shadow:0 8px 30px rgba(0,156,222,.4)" id="btn-home-start">
+      ▶ Iniciar Treinamento
+    </button>
+    <div id="home-badges" style="margin-top:32px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN: INTRO
+══════════════════════════════════════ -->
+<div id="scr-intro" class="screen hidden" style="justify-content:center">
+  <div style="text-align:center;max-width:480px">
+    <div id="intro-icon" style="width:80px;height:80px;border-radius:20px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:2.5rem;margin:0 auto 24px"></div>
+    <div id="intro-step" style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px"></div>
+    <h2 id="intro-title" style="font-family:'Barlow Condensed',sans-serif;font-size:2.8rem;font-weight:900;text-transform:uppercase;color:#fff;line-height:1;margin-bottom:8px"></h2>
+    <div id="intro-sub" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.08em;margin-bottom:24px"></div>
+    <p id="intro-body" style="background:rgba(255,255,255,.1);border-radius:12px;padding:16px 20px;color:rgba(255,255,255,.8);font-size:.95rem;line-height:1.65;margin-bottom:28px"></p>
+    <div id="intro-score-txt" style="color:rgba(255,255,255,.45);font-size:.85rem;margin-bottom:28px"></div>
+    <button id="btn-intro-start" onclick="startPlaying()"
+      style="background:#fff;border:none;border-radius:12px;font-size:1.2rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:14px 44px">
+      Começar Fase ▶
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN: PLAYING (filled dynamically)
+══════════════════════════════════════ -->
+<div id="scr-playing" class="screen bg-dark hidden" style="justify-content:flex-start;padding-top:24px">
+  <div id="playing-inner" style="max-width:720px;width:100%"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN: LEVEL COMPLETE
+══════════════════════════════════════ -->
+<div id="scr-complete" class="screen hidden">
+  <div style="text-align:center;max-width:420px">
+    <div id="complete-stars" style="font-size:3rem;margin-bottom:16px"></div>
+    <div id="complete-step" style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px"></div>
+    <h2 id="complete-title" style="font-family:'Barlow Condensed',sans-serif;font-size:2.5rem;font-weight:900;text-transform:uppercase;margin:0 0 24px"></h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px">
+      <div style="background:rgba(255,255,255,.1);border-radius:12px;padding:16px">
+        <div id="complete-earned" style="font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#FFD700"></div>
+        <div style="font-size:.78rem;color:rgba(255,255,255,.5);text-transform:uppercase">pts nesta fase</div>
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:12px;padding:16px">
+        <div id="complete-total" style="font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:900;color:#009CDE"></div>
+        <div style="font-size:.78rem;color:rgba(255,255,255,.5);text-transform:uppercase">total acumulado</div>
+      </div>
+    </div>
+    <button id="btn-complete-next" onclick="nextAfterComplete()"
+      style="background:#fff;border:none;border-radius:12px;font-size:1.2rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:16px 44px"></button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCREEN: CERTIFICATE
+══════════════════════════════════════ -->
+<div id="scr-final" class="screen bg-blue hidden" style="gap:24px">
+  <div id="cert-wrap">
+    <div class="cert-accent"></div>
+    <div class="cert-frame">
+      <div class="cert-corner tl"></div><div class="cert-corner tr"></div>
+      <div class="cert-corner bl"></div><div class="cert-corner br"></div>
+      <!-- header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
+        <span class="logo" style="font-size:2.6rem;color:#002B49">amcor</span>
+        <div style="text-align:right">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.25em;text-transform:uppercase;color:#666;margin-bottom:2px">Amcor Flexibles · Brasil</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.65rem;color:#999;letter-spacing:.1em">Treinamento Operacional</div>
+        </div>
+      </div>
+      <!-- title -->
+      <div style="text-align:center;margin-bottom:24px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.35em;text-transform:uppercase;color:#C4A747;margin-bottom:10px">✦ &nbsp; Certificado de Conclusão &nbsp; ✦</div>
+        <h1 style="font-family:'Playfair Display',serif;font-size:clamp(1.6rem,4vw,2.4rem);font-weight:700;font-style:italic;color:#002B49;margin:0 0 6px;line-height:1.2">Balanço de Massa</h1>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;color:#555;letter-spacing:.08em;text-transform:uppercase">Treinamento em Gestão de Perdas de Processo</div>
+      </div>
+      <!-- divider -->
+      <div class="cert-divider">
+        <div class="cert-divider-line" style="background:linear-gradient(90deg,transparent,#C4A747)"></div>
+        <span style="color:#C4A747;font-size:1.1rem">✦</span>
+        <div class="cert-divider-line" style="background:linear-gradient(90deg,#C4A747,transparent)"></div>
+      </div>
+      <!-- body -->
+      <div style="text-align:center;margin-bottom:20px">
+        <p style="font-size:.95rem;color:#555;margin-bottom:10px;line-height:1.7">Certificamos que</p>
+        <div id="cert-name" style="font-family:'Playfair Display',serif;font-size:clamp(1.6rem,5vw,2.6rem);font-weight:700;color:#002B49;line-height:1.1;border-bottom:2px solid #C4A747;padding-bottom:8px;display:inline-block;min-width:300px"></div>
+        <p style="font-size:.95rem;color:#555;margin-top:12px;line-height:1.7;max-width:540px;margin-left:auto;margin-right:auto">
+          concluiu com êxito o treinamento de <strong>Balanço de Massa e Gestão de Perdas de Processo</strong>, demonstrando compreensão dos tipos de material (ROH, HALB, FERT), fluxo produtivo, cálculo de perdas e waste total da planta.
+        </p>
+      </div>
+      <!-- stats -->
+      <div style="display:flex;justify-content:center;gap:32px;margin:24px 0;padding:16px 0;border-top:1px solid #eee;border-bottom:1px solid #eee">
+        <div style="text-align:center">
+          <div id="cert-score" style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:900;color:#0067B1"></div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888">Pontuação</div>
+          <div id="cert-score-sub" style="font-size:.7rem;color:#aaa;margin-top:2px"></div>
+        </div>
+        <div style="width:1px;background:#eee"></div>
+        <div style="text-align:center">
+          <div id="cert-pct" style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:900;color:#0067B1"></div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888">Aproveitamento</div>
+          <div style="font-size:.7rem;color:#aaa;margin-top:2px">de desempenho</div>
+        </div>
+        <div style="width:1px;background:#eee"></div>
+        <div style="text-align:center">
+          <div id="cert-grade" style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:900;color:#0067B1"></div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888">Classificação</div>
+          <div id="cert-rank" style="font-size:.7rem;color:#aaa;margin-top:2px"></div>
+        </div>
+      </div>
+      <!-- footer -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:20px">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:4px">Data de Emissão</div>
+          <div id="cert-date" style="font-size:.9rem;color:#444"></div>
+        </div>
+        <div style="text-align:center">
+          <div style="width:160px;border-bottom:1.5px solid #333;margin-bottom:4px"></div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#888">Amcor Flexibles Brasil</div>
+        </div>
+      </div>
+    </div>
+    <div class="cert-accent-sm"></div>
+  </div>
+  <!-- action buttons -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+    <button id="btn-download" onclick="downloadCert()"
+      style="background:#FFD700;color:#002B49;border:none;border-radius:12px;font-size:1.1rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:14px 32px;box-shadow:0 6px 20px rgba(255,215,0,.35)">
+      ⬇️ Baixar Certificado (PDF)
+    </button>
+    <button onclick="restartGame()"
+      style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:12px;font-size:1.1rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:14px 32px">
+      🔄 Jogar Novamente
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SCRIPT
+══════════════════════════════════════ -->
+<script>
+/* ────────────────────────────────
+   CALCULADORA
+──────────────────────────────── */
+let calcState = { cur: '0', prev: '', op: null, fresh: false };
+
+function calcShow(visible) {
+  const wrap = $('calc-fab-wrap'), panel = $('calc-panel');
+  if (visible) { wrap.classList.remove('hidden'); }
+  else         { wrap.classList.add('hidden'); panel.classList.add('hidden'); panel.classList.remove('open'); }
+}
+
+function toggleCalc() {
+  const panel = $('calc-panel');
+  panel.classList.remove('hidden');
+  panel.classList.toggle('open');
+}
+
+// Fecha a calculadora ao clicar fora do painel e do botão
+document.addEventListener('click', function(e) {
+  const panel = $('calc-panel');
+  const fab   = $('calc-fab');
+  if (!panel || !fab) return;
+  if (!panel.classList.contains('open')) return;
+  if (!panel.contains(e.target) && !fab.contains(e.target)) {
+    panel.classList.remove('open');
+  }
+});
+
+function calcRender() {
+  const s = calcState;
+  $('calc-val').textContent  = s.cur.length > 10 ? parseFloat(s.cur).toPrecision(8) : s.cur;
+  $('calc-expr').textContent = s.prev && s.op ? s.prev + ' ' + ({'+':'+','-':'−','*':'×','/':'÷'}[s.op]||s.op) : '';
+}
+
+function calcInput(key) {
+  const s = calcState;
+  if (key === 'C') {
+    calcState = { cur: '0', prev: '', op: null, fresh: false };
+  } else if (key === '±') {
+    s.cur = String(parseFloat(s.cur) * -1);
+  } else if (key === '%') {
+    s.cur = String(parseFloat(s.cur) / 100);
+  } else if (['+','-','*','/'].includes(key)) {
+    if (s.op && !s.fresh) {
+      const res = calcEval(parseFloat(s.prev), parseFloat(s.cur), s.op);
+      s.prev = String(res); s.cur = String(res);
+    } else {
+      s.prev = s.cur;
+    }
+    s.op = key; s.fresh = true;
+  } else if (key === '=') {
+    if (!s.op) return;
+    const res = calcEval(parseFloat(s.prev), parseFloat(s.cur), s.op);
+    // round floating point noise
+    s.cur = String(Math.round(res * 1e10) / 1e10);
+    s.prev = ''; s.op = null; s.fresh = false;
+  } else if (key === '.') {
+    if (s.fresh) { s.cur = '0'; s.fresh = false; }
+    if (!s.cur.includes('.')) s.cur += '.';
+  } else { // digit
+    if (s.cur === '0' || s.fresh) { s.cur = key; s.fresh = false; }
+    else if (s.cur.replace('-','').replace('.','').length < 12) s.cur += key;
+  }
+  calcRender();
+}
+
+function calcEval(a, b, op) {
+  if (op === '+') return a + b;
+  if (op === '-') return a - b;
+  if (op === '*') return a * b;
+  if (op === '/') return b !== 0 ? a / b : 0;
+  return b;
+}
+
+/* ────────────────────────────────
+   HELPERS
+──────────────────────────────── */
+const r1 = n => Math.round(n * 10) / 10;
+const pct = (perda, consumo) => r1((perda / consumo) * 100);
+const $ = id => document.getElementById(id);
+const shuffle = arr => [...arr].sort(() => Math.random() - .5);
+
+let toastTimer = null;
+function showToast(msg, ok) {
+  const el = $('toast');
+  el.textContent = (ok ? '✅ ' : '❌ ') + msg;
+  el.style.background = ok ? '#008A5E' : '#C0392B';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function showBurst(pts) {
+  const el = $('burst');
+  el.textContent = '+' + pts + ' pts';
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = 'burst .8s ease forwards';
+}
+
+/* ────────────────────────────────
+   DATA
+──────────────────────────────── */
+const LEVELS = [
+  {
+    id:1, title:'Conhecendo os Materiais', subtitle:'ROH, HALB e FERT',
+    icon:'🏭', color:'#0067B1', type:'classify',
+    intro:'Clique nos botões ao lado de cada item para classificá-lo como ROH (matéria-prima), HALB (semiacabado) ou FERT (produto acabado).',
+    items:[
+      {id:1,name:'Filme plástico',correct:'ROH',icon:'🎞️'},
+      {id:2,name:'Tinta de impressão',correct:'ROH',icon:'🎨'},
+      {id:3,name:'Bobina cortada final',correct:'FERT',icon:'✅'},
+      {id:4,name:'Filme impresso',correct:'HALB',icon:'🖨️'},
+      {id:5,name:'Adesivo laminação',correct:'ROH',icon:'🧪'},
+      {id:6,name:'Estrutura laminada',correct:'HALB',icon:'⚙️'},
+      {id:8,name:'Verniz',correct:'ROH',icon:'🫙'},
+      {id:9,name:'Sachet embalado',correct:'FERT',icon:'📦'},
+    ],
+  },
+  {
+    id:2, title:'O Fluxo da Fábrica', subtitle:'Qual fase gera o quê?',
+    icon:'🔗', color:'#E07000', type:'quiz',
+    questions:[
+      {q:'A fase de IMPRESSÃO gera qual tipo de material?',options:['ROH','HALB','FERT','Nenhum'],correct:1,explain:'A impressão transforma o filme base (ROH) em filme impresso — um produto semiacabado (HALB) que precisa de mais etapas.'},
+      {q:'A fase de CORTE gera qual tipo de material?',options:['ROH','HALB','FERT','Depende'],correct:2,explain:'O corte é uma fase final. Transforma o HALB em bobina cortada no tamanho do cliente — um produto acabado (FERT).'},
+      {q:'A fase de LAMINAÇÃO recebe qual tipo de material como entrada?',options:['Somente ROH','HALB e ROH','Somente FERT','FERT e HALB'],correct:1,explain:'A laminação recebe o HALB (filme impresso) mais o adesivo (ROH) e os une para criar a estrutura de barreira.'},
+      {q:'Um produto só pode ser chamado de FERT quando:',options:['Passa pela impressão','Sai do almoxarifado','Está pronto para o cliente e passou por todas as fases','É pesado na balança'],correct:2,explain:'FERT é o produto acabado — passou por todas as fases previstas, atende às especificações e está pronto para ser entregue.'},
+      {q:'Qual fase NÃO gera HALB?',options:['Impressão','Laminação','Formato','Todas geram HALB'],correct:2,explain:'A fase de Formato gera diretamente FERT (produto acabado), e NÃO gera HALB. Impressão e Laminação são fases intermediárias que geram HALB.'},
+    ],
+  },
+  {
+    id:3, title:'Balanço de Massa', subtitle:'Calcule as perdas',
+    icon:'⚖️', color:'#008A5E', type:'calc',
+    intro:'Use os dados fornecidos para calcular a perda e o % de waste. Arredonde para uma casa decimal.',
+    problem:{
+      title:'Laminação do Dia',
+      desc:'Foram consumidos 1.200 kg de HALB e 48 kg de adesivo (ROH). Saíram 1.190 kg de estrutura laminada (HALB).',
+      consumo:1248, producao:1190,
+      question:'Qual é o % de perda da laminação?',
+      hint:'Consumo total = HALB + Adesivo. Depois: Perda% = Perda ÷ Consumo × 100',
+    },
+  },
+  {
+    id:4, title:'Waste da Planta', subtitle:'Fórmula completa',
+    icon:'🏆', color:'#6B3FA0', type:'plant_calc',
+    intro:'Agora calculamos o Waste Total da planta — considerando todas as fases.',
+    problem:{
+      perdaHalb:320, consumoFert:4800, producaoFert:4560, consumoTotal:5120,
+      desc:'No mês de março: Perda HALB = 320 kg | Consumo nas fases FERT = 4.800 kg | Produção FERT aprovada = 4.560 kg',
+    },
+  },
+  {
+    id:5, title:'Controle & Impacto', subtitle:'Quiz final',
+    icon:'🎯', color:'#C0392B', type:'quiz',
+    questions:[
+      {q:'O que é "Pé de Máquina"?',options:['O estoque no almoxarifado central','Material fisicamente na máquina que já saiu do estoque mas ainda não virou produto','O produto acabado esperando expedição','A perda registrada no sistema'],correct:1,explain:'Pé de máquina é o material temporário alocado na máquina durante a produção. Já saiu do estoque mas não é consumo confirmado ainda.'},
+      {q:'O consumo das TINTAS é lançado como:',options:['Manualmente pelo operador a cada troca de cor','Automaticamente por Backflush ao confirmar a produção','Somente no fechamento do mês','Nunca é lançado'],correct:1,explain:'As tintas são consumidas por Backflush — automático. O sistema calcula com base na estrutura do produto.'},
+      {q:'Por que as tintas entram no BM apenas pela parte SÓLIDA?',options:['Porque são mais baratas','Porque o solvente evapora no processo e não fica no produto','Porque o sistema não consegue pesar líquidos','Por determinação fiscal'],correct:1,explain:'A tinta é líquida — parte evapora nos fornos. Só a fração sólida fica no produto. Incluir o solvente criaria uma perda fictícia enorme.'},
+      {q:'Se o estoque físico tem 200 kg e o sistema mostra 350 kg, isso causa:',options:['Nada — é normal','O BM mostrará 150 kg de perda falsa que não existiu no processo','A produção para automaticamente','O sistema ajusta sozinho'],correct:1,explain:'A diferença entre físico e sistema aparece como perda de processo no BM — mas pode ser apenas falta de inventário correto.'},
+      {q:'Para calcular o Waste %, sempre dividimos pelo:',options:['Produção FERT','Consumo total','Perda HALB','Número de turnos'],correct:1,explain:'A perda % = Perda ÷ Consumo × 100. Usamos o consumo como base pois representa o total de recursos utilizados.'},
+    ],
+  },
+];
+
+const LEVEL_MAX = [90, 100, 30, 50, 100];
+const ZONE_COLORS = {ROH:'#0067B1', HALB:'#E07000', FERT:'#008A5E'};
+const ZONE_LABELS = {ROH:'Matéria-prima', HALB:'Semiacabado', FERT:'Produto Acabado'};
+
+/* ────────────────────────────────
+   STATE
+──────────────────────────────── */
+let playerName = '';
+let currentLevel = 0;
+let levelsCompleted = 0;
+let totalScore = 0;
+let lastEarned = 0;
+
+/* ────────────────────────────────
+   NAVIGATION
+──────────────────────────────── */
+const SCREENS = ['scr-name','scr-home','scr-intro','scr-playing','scr-complete','scr-final'];
+function showScreen(id) {
+  SCREENS.forEach(s => $(s).classList.add('hidden'));
+  $(id).classList.remove('hidden');
+}
+
+/* ────────────────────────────────
+   NAME SCREEN
+──────────────────────────────── */
+$('inp-name').addEventListener('input', function() {
+  const ok = this.value.trim();
+  const btn = $('btn-name-go');
+  btn.style.background = ok ? '#009CDE' : 'rgba(255,255,255,.15)';
+  btn.style.color = ok ? '#002B49' : 'rgba(255,255,255,.3)';
+  btn.style.boxShadow = ok ? '0 8px 30px rgba(0,156,222,.4)' : 'none';
+});
+$('inp-name').addEventListener('keydown', e => { if (e.key==='Enter') nameConfirm(); });
+
+function nameConfirm() {
+  const name = $('inp-name').value.trim();
+  if (!name) return;
+  playerName = name;
+  renderHome();
+  showScreen('scr-home');
+}
+
+/* ────────────────────────────────
+   HOME SCREEN
+──────────────────────────────── */
+function renderHome() {
+  $('home-greet').innerHTML = `Olá, <strong style="color:#fff">${playerName}</strong>!`;
+  const stats = $('home-stats');
+  if (levelsCompleted > 0) {
+    stats.style.display = 'flex';
+    $('home-score').textContent = totalScore;
+    $('home-lvls').textContent = `${levelsCompleted}/${LEVELS.length}`;
+  }
+  $('btn-home-start').textContent = levelsCompleted > 0 ? 'Continuar Jogo' : '▶ Iniciar Treinamento';
+
+  const badgeWrap = $('home-badges');
+  badgeWrap.innerHTML = '';
+  LEVELS.forEach((l, i) => {
+    const d = document.createElement('div');
+    d.title = l.title;
+    Object.assign(d.style, {
+      width:'40px', height:'40px', borderRadius:'10px',
+      background: i < levelsCompleted ? l.color : 'rgba(255,255,255,.1)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontSize:'1.1rem',
+      border: i < levelsCompleted ? `2px solid ${l.color}` : '2px solid rgba(255,255,255,.15)',
+    });
+    d.textContent = i < levelsCompleted ? l.icon : '🔒';
+    badgeWrap.appendChild(d);
+  });
+}
+
+function startGame() {
+  if (levelsCompleted >= LEVELS.length) { levelsCompleted = 0; totalScore = 0; currentLevel = 0; }
+  else currentLevel = levelsCompleted;
+  renderIntro();
+  showScreen('scr-intro');
+}
+
+/* ────────────────────────────────
+   INTRO SCREEN
+──────────────────────────────── */
+function renderIntro() {
+  const lv = LEVELS[currentLevel];
+  $('scr-intro').style.background = `linear-gradient(160deg,#001f3f 0%,${lv.color} 100%)`;
+  $('intro-icon').textContent = lv.icon;
+  $('intro-step').textContent = `Fase ${lv.id} de ${LEVELS.length}`;
+  $('intro-title').textContent = lv.title;
+  $('intro-sub').textContent = lv.subtitle;
+  $('intro-body').textContent = lv.intro || '';
+  $('intro-body').style.display = lv.intro ? '' : 'none';
+  $('intro-score-txt').innerHTML = `Pontuação atual: <strong style="color:#FFD700">${totalScore} pts</strong>`;
+  $('btn-intro-start').style.color = lv.color;
+}
+
+function startPlaying() {
+  const lv = LEVELS[currentLevel];
+  const isCalcLevel = lv.type === 'calc' || lv.type === 'plant_calc';
+  calcShow(isCalcLevel);
+  calcState = { cur: '0', prev: '', op: null, fresh: false };
+  calcRender();
+  if      (lv.type === 'classify')   renderClassify(lv);
+  else if (lv.type === 'quiz')       renderQuiz(lv);
+  else if (lv.type === 'calc')       renderCalc(lv);
+  else if (lv.type === 'plant_calc') renderPlantCalc(lv);
+  showScreen('scr-playing');
+}
+
+/* ────────────────────────────────
+   LEVEL HEADER helper
+──────────────────────────────── */
+function lvHeader(lv, progressCurrent, progressTotal) {
+  return `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <span class="logo" style="font-size:2rem">${'amcor'}</span>
+      <div style="flex:1">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.4)">Fase ${lv.id}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:900;text-transform:uppercase">${lv.title}</div>
+        <div class="pbar-wrap" style="margin-top:6px">
+          <div class="pbar-fill" style="width:${(progressCurrent/progressTotal)*100}%;background:${lv.color}"></div>
+        </div>
+      </div>
+      <div id="hdr-score" style="font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;font-weight:900;color:#FFD700">${totalScore}</div>
+    </div>`;
+}
+
+function updateHdrScore(pts) {
+  const el = $('hdr-score');
+  if (el) el.textContent = totalScore + pts;
+}
+
+/* ════════════════════════════════
+   LEVEL 1: CLASSIFY
+════════════════════════════════ */
+function renderClassify(lv) {
+  const items = shuffle(lv.items);
+  const answers = {}; // itemId -> zone
+  let checked = false;
+
+  function render() {
+    const zones = ['ROH','HALB','FERT'];
+    const classified = Object.keys(answers).length;
+
+    let itemsHTML = items.map(item => {
+      const chosen = answers[item.id];
+      let bg = 'rgba(255,255,255,.06)', border = 'rgba(255,255,255,.1)';
+      if (checked) {
+        bg = chosen === item.correct ? 'rgba(0,138,94,.25)' : chosen ? 'rgba(192,57,43,.25)' : 'rgba(255,255,255,.06)';
+        border = chosen === item.correct ? '#008A5E' : chosen ? '#C0392B' : 'rgba(255,255,255,.1)';
+      } else if (chosen) {
+        bg = ZONE_COLORS[chosen] + '22'; border = ZONE_COLORS[chosen];
+      }
+      const btnHTML = !checked ? zones.map(z => `
+        <button onclick="classifyItem(${item.id},'${z}')"
+          style="background:${answers[item.id]===z ? ZONE_COLORS[z] : 'rgba(255,255,255,.08)'};
+                 color:${answers[item.id]===z ? '#fff' : 'rgba(255,255,255,.5)'};
+                 border:1px solid ${answers[item.id]===z ? ZONE_COLORS[z] : 'rgba(255,255,255,.1)'};
+                 border-radius:6px;padding:4px 8px;font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700">
+          ${z}
+        </button>`).join('') :
+        `<span class="zone-pill" style="background:${ZONE_COLORS[item.correct]}33;color:${ZONE_COLORS[item.correct]};border-color:${ZONE_COLORS[item.correct]}">${item.correct}</span>
+         <span>${checked && chosen === item.correct ? '✅' : checked && chosen ? '❌' : ''}</span>`;
+
+      return `<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;transition:all .2s;margin-bottom:6px">
+        <span style="font-size:1.1rem">${item.icon}</span>
+        <span style="flex:1;font-weight:500;font-size:.9rem">${item.name}</span>
+        <div style="display:flex;gap:4px;align-items:center">${btnHTML}</div>
+      </div>`;
+    }).join('');
+
+    let zonesHTML = zones.map(z => {
+      const zItems = items.filter(i => answers[i.id] === z);
+      return `<div style="background:${ZONE_COLORS[z]}15;border:1px solid ${ZONE_COLORS[z]}44;border-radius:12px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:900;color:${ZONE_COLORS[z]};text-transform:uppercase">${z}</span>
+          <span style="font-size:.78rem;color:rgba(255,255,255,.35);margin-left:auto">${ZONE_LABELS[z]}</span>
+        </div>
+        ${zItems.length === 0
+          ? '<div style="font-size:.78rem;color:rgba(255,255,255,.25);font-style:italic">Nenhum aqui</div>'
+          : zItems.map(i => `<span style="background:rgba(255,255,255,.08);border-radius:6px;padding:3px 8px;font-size:.78rem;color:rgba(255,255,255,.7);margin:2px;display:inline-block">${i.icon} ${i.name}</span>`).join('')}
+      </div>`;
+    }).join('');
+
+    let actionHTML = '';
+    if (!checked) {
+      const ready = classified === items.length;
+      actionHTML = `<button onclick="checkClassify()"
+        style="width:100%;background:${ready ? '#009CDE' : 'rgba(255,255,255,.1)'};color:${ready ? '#002B49' : 'rgba(255,255,255,.3)'};border:none;border-radius:10px;font-size:1.1rem;font-weight:900;text-transform:uppercase;padding:14px;cursor:${ready ? 'pointer' : 'not-allowed'}">
+        ${ready ? '✓ Verificar Respostas' : `Classifique os ${items.length - classified} restantes`}
+      </button>`;
+    } else {
+      const correct = items.filter(i => answers[i.id] === i.correct).length;
+      const score = correct * 10;
+      actionHTML = `
+        <div style="background:rgba(0,43,73,.3);border:1px solid #002B49;border-radius:10px;padding:12px 16px;margin-bottom:12px;text-align:center">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:900;color:#FFD700">${score} pts</div>
+          <div style="font-size:.82rem;color:rgba(255,255,255,.5)">${correct}/${items.length} corretos</div>
+        </div>
+        <button onclick="levelComplete(${score})" class="btn-primary btn-next">Próxima Fase →</button>`;
+    }
+
+    $('playing-inner').innerHTML = `
+      ${lvHeader(lv, classified, items.length)}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:10px">Materiais</div>
+          ${itemsHTML}
+        </div>
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:10px">Tipos de Material</div>
+          ${zonesHTML}
+          ${actionHTML}
+        </div>
+      </div>`;
+
+    // re-bind
+    window.classifyItem = (id, zone) => {
+      if (checked) return;
+      answers[id] = zone;
+      render();
+    };
+    window.checkClassify = () => {
+      if (Object.keys(answers).length < items.length) return;
+      checked = true;
+      render();
+    };
+  }
+  render();
+}
+
+/* ════════════════════════════════
+   QUIZ LEVEL
+════════════════════════════════ */
+function renderQuiz(lv) {
+  let qi = 0, lvScore = 0;
+
+  function renderQ() {
+    const q = lv.questions[qi];
+    let selected = null, revealed = false;
+
+    // Embaralha as opções uma vez por pergunta, preservando qual é a correta
+    const shuffled = q.options
+      .map((text, i) => ({ text, isCorrect: i === q.correct }))
+      .sort(() => Math.random() - .5);
+    const correctShuffled = shuffled.findIndex(o => o.isCorrect);
+
+    function draw() {
+      const optsHTML = shuffled.map((opt, idx) => {
+        let bg='rgba(255,255,255,.05)', border='rgba(255,255,255,.1)', color='#fff';
+        if (revealed) {
+          if (idx === correctShuffled)   { bg='rgba(0,138,94,.25)';  border='#008A5E'; color='#5DDBB0'; }
+          else if (idx === selected)     { bg='rgba(192,57,43,.25)'; border='#C0392B'; color='#FF8A7A'; }
+        }
+        const letter = revealed && idx === correctShuffled ? '✓'
+          : revealed && idx === selected && idx !== correctShuffled ? '✗'
+          : String.fromCharCode(65 + idx);
+        const letterBg = revealed && idx === correctShuffled ? '#008A5E'
+          : revealed && idx === selected ? '#C0392B'
+          : 'rgba(255,255,255,.08)';
+        return `<button onclick="selectOpt(${idx})"
+          style="background:${bg};border:1px solid ${border};color:${color};border-radius:12px;padding:14px 18px;text-align:left;cursor:${revealed?'default':'pointer'};font-size:.95rem;font-weight:500;display:flex;align-items:center;gap:12px;transition:all .2s;width:100%;margin-bottom:8px">
+          <span style="width:28px;height:28px;border-radius:8px;background:${letterBg};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:.85rem;font-weight:700;flex-shrink:0">${letter}</span>
+          ${opt.text}
+        </button>`;
+      }).join('');
+
+      const isRight = selected === correctShuffled;
+      const explainHTML = revealed ? `
+        <div style="background:${isRight?'rgba(0,138,94,.15)':'rgba(0,43,73,.3)'};border:1px solid ${isRight?'#008A5E':'#002B49'};border-radius:12px;padding:16px;margin-bottom:16px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:6px">${isRight?'✅ Correto!':'❌ Resposta correta:'}</div>
+          <p style="font-size:.9rem;color:rgba(255,255,255,.8);line-height:1.6">${q.explain}</p>
+        </div>
+        <button onclick="nextQ()" class="btn-primary" style="background:${lv.color}">${qi+1 >= lv.questions.length ? 'Ver Resultado →' : 'Próxima →'}</button>` : '';
+
+      $('playing-inner').innerHTML = `
+        ${lvHeader(lv, qi, lv.questions.length)}
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title">Pergunta ${qi+1} de ${lv.questions.length}</div>
+          <p style="font-size:1.1rem;font-weight:500;line-height:1.5">${q.q}</p>
+        </div>
+        <div>${optsHTML}</div>
+        ${explainHTML}`;
+
+      window.selectOpt = (idx) => {
+        if (revealed) return;
+        selected = idx; revealed = true;
+        if (idx === correctShuffled) { lvScore += 20; showBurst(20); }
+        draw();
+      };
+      window.nextQ = () => {
+        qi++;
+        if (qi >= lv.questions.length) levelComplete(lvScore);
+        else renderQ();
+      };
+    }
+    draw();
+  }
+  renderQ();
+}
+
+/* ════════════════════════════════
+   CALC LEVEL (fase 3)
+════════════════════════════════ */
+function renderCalc(lv) {
+  const prob = lv.problem;
+  const perda = prob.consumo - prob.producao;
+  const correctPct = pct(perda, prob.consumo);
+  let revealed = false, earnedScore = 0, isCorrect = false;
+
+  function draw() {
+    const actionHTML = !revealed ? `
+      <div style="display:flex;gap:10px;align-items:center">
+        <input id="inp-calc" type="text" inputmode="decimal" placeholder="Ex: 12,5" class="input-calc" style="flex:1" />
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:700;color:rgba(255,255,255,.4)">%</span>
+        <button onclick="checkCalc()" style="background:${lv.color};color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:1rem;font-weight:900;text-transform:uppercase">OK</button>
+      </div>` :
+      `<div style="display:flex;gap:10px;align-items:center">
+        <input type="number" value="${document.getElementById('inp-calc')?.value||''}" disabled class="input-calc" style="flex:1;border-color:${isCorrect?'#008A5E':'#C0392B'}" />
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:700;color:rgba(255,255,255,.4)">%</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:${isCorrect?'#5DDBB0':'#FF8A7A'}">${isCorrect?'✅ Correto!':'❌ Era '+correctPct+'%'}</span>
+      </div>`;
+
+    const explainHTML = !revealed ? '' : `
+      <div style="background:${isCorrect?'rgba(0,138,94,.15)':'rgba(192,57,43,.1)'};border:1px solid ${isCorrect?'#008A5E':'#C0392B'};border-radius:12px;padding:16px;margin:12px 0">
+        <div class="card-title">${isCorrect?'✅ Resolução confirmada':'❌ Veja a resolução correta'}</div>
+        ${[
+          {label:'Perda =', val:`${prob.consumo} − ${prob.producao} = ${perda} kg`, color:'#FF8A7A'},
+          {label:'Perda % =', val:`${perda} ÷ ${prob.consumo} × 100 = ${correctPct}%`, color:'#FFD700'},
+        ].map(row=>`<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:.85rem;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.4)">${row.label}</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:900;color:${row.color}">${row.val}</span>
+        </div>`).join('')}
+      </div>
+      <button onclick="levelComplete(${earnedScore})" class="btn-primary" style="background:${lv.color}">Próxima Fase →</button>`;
+
+    $('playing-inner').innerHTML = `
+      ${lvHeader(lv, 0, 1)}
+      <div class="card">
+        <div class="card-title" style="color:${lv.color}">${prob.title}</div>
+        <p style="font-size:.95rem;color:rgba(255,255,255,.8);line-height:1.65;margin-bottom:16px">${prob.desc}</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div style="background:rgba(0,43,73,.3);border:1px solid rgba(0,43,73,.6);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:900;color:#7FC8FF">${prob.consumo.toLocaleString('pt-BR')} kg</div>
+            <div style="font-size:.75rem;color:rgba(255,255,255,.4);text-transform:uppercase">Consumo Total</div>
+          </div>
+          <div style="background:rgba(0,138,94,.2);border:1px solid rgba(0,138,94,.4);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:900;color:#5DDBB0">${prob.producao.toLocaleString('pt-BR')} kg</div>
+            <div style="font-size:.75rem;color:rgba(255,255,255,.4);text-transform:uppercase">Produção Aprovada</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.05);border-radius:8px;padding:10px 14px;font-size:.82rem;color:rgba(255,255,255,.45);margin-bottom:16px">💡 ${prob.hint}</div>
+      </div>
+      <div class="card" style="border-color:${revealed?(isCorrect?'#008A5E':'#C0392B'):'rgba(255,255,255,.1)'}">
+        <p style="font-weight:600;margin-bottom:12px">${prob.question}</p>
+        ${actionHTML}
+      </div>
+      ${explainHTML}`;
+
+    window.checkCalc = () => {
+      const val = parseFloat(($('inp-calc').value||'').replace(',','.'));
+      if (isNaN(val)) return;
+      const diff = Math.abs(val - correctPct);
+      const pts = diff <= .1 ? 30 : diff <= .5 ? 15 : diff <= 1.5 ? 5 : 0;
+      isCorrect = diff <= .1; earnedScore = pts; revealed = true;
+      if (pts > 0) showBurst(pts);
+      showToast(isCorrect ? 'Exato! Cálculo perfeito!' : pts > 0 ? `Quase! A resposta era ${correctPct}%` : `Resposta: ${correctPct}%. Veja a explicação.`, pts > 0);
+      draw();
+    };
+  }
+  draw();
+}
+
+/* ════════════════════════════════
+   PLANT CALC LEVEL (fase 4)
+════════════════════════════════ */
+function renderPlantCalc(lv) {
+  const {perdaHalb, consumoFert, producaoFert, consumoTotal} = lv.problem;
+  const correctWaste = perdaHalb + consumoFert - producaoFert;
+  const correctPctVal = pct(correctWaste, consumoTotal);
+
+  let step = 0; // 0=passo1, 1=passo2, 2=done
+  let lvScore = 0;
+  let waste_checked=false, pct_checked=false;
+  let waste_correct=false, pct_correct=false;
+  let waste_pts=0, pct_pts=0;
+  let inp_waste_val='', inp_pct_val='';
+
+  function draw() {
+    // passo 1
+    const step1HTML = `
+      <div class="card" style="border-color:${waste_checked?(waste_correct?'#008A5E':'#C0392B'):'rgba(255,255,255,.1)'}">
+        <p style="font-weight:600;margin-bottom:12px">Passo 1: Qual é o Waste total em kg?</p>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input id="inp-waste" type="text" inputmode="decimal" value="${inp_waste_val}" placeholder="Ex: 1.200" class="input-calc" style="flex:1;border-color:${waste_checked?(waste_correct?'#008A5E':'#C0392B'):'rgba(255,255,255,.2)'}" ${waste_checked?'disabled':''} />
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:700;color:rgba(255,255,255,.4)">kg</span>
+          ${!waste_checked
+            ? `<button onclick="checkWaste()" style="background:${lv.color};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:900;text-transform:uppercase;font-size:.9rem">OK</button>`
+            : `<span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:${waste_correct?'#5DDBB0':'#FF8A7A'}">${waste_correct?'✅ Correto!':'❌ Era '+correctWaste+' kg'}</span>`}
+        </div>
+        ${waste_checked ? `
+          <div style="margin-top:12px;background:${waste_correct?'rgba(0,138,94,.15)':'rgba(192,57,43,.1)'};border:1px solid ${waste_correct?'#008A5E':'#C0392B'};border-radius:8px;padding:14px">
+            <div class="card-title">${waste_correct?'✅ Resolução confirmada':'❌ Veja a resolução correta'}</div>
+            ${[
+              {label:'Perda HALB =',    val:`${perdaHalb} kg`,                                         color:'#FFB566'},
+              {label:'+ Consumo FERT =',val:`${consumoFert} kg`,                                       color:'#7FC8FF'},
+              {label:'− Produção FERT =',val:`${producaoFert} kg`,                                     color:'#5DDBB0'},
+              {label:'Waste Total =',   val:`${perdaHalb} + ${consumoFert} − ${producaoFert} = <span style="color:#FF8A7A">${correctWaste} kg</span>`, color:'#FFD700'},
+            ].map(row=>`<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.4)">${row.label}</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;font-weight:900;color:${row.color}">${row.val}</span>
+            </div>`).join('')}
+          </div>
+          <div style="margin-top:10px;text-align:right">
+            <button onclick="passo2()" style="background:${lv.color};color:#fff;border:none;border-radius:10px;padding:10px 22px;font-weight:900;text-transform:uppercase;font-size:.95rem;cursor:pointer">Passo 2 →</button>
+          </div>` : ''}
+      </div>`;
+
+    // passo 2 (só mostra se step>=1)
+    const step2HTML = step < 1 ? '' : `
+      <div class="card" style="border-color:${pct_checked?(pct_correct?'#008A5E':'#C0392B'):'rgba(255,255,255,.1)'}">
+        <p style="font-weight:600;margin-bottom:12px">Passo 2: Qual é o Waste em %?</p>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input id="inp-pct" type="text" inputmode="decimal" value="${inp_pct_val}" placeholder="Ex: 12,5" class="input-calc" style="flex:1;border-color:${pct_checked?(pct_correct?'#008A5E':'#C0392B'):'rgba(255,255,255,.2)'}" ${pct_checked?'disabled':''} />
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:700;color:rgba(255,255,255,.4)">%</span>
+          ${!pct_checked
+            ? `<button onclick="checkPct()" style="background:${lv.color};color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:900;text-transform:uppercase;font-size:.9rem">OK</button>`
+            : `<span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:${pct_correct?'#5DDBB0':'#FF8A7A'}">${pct_correct?'✅ Correto!':'❌ Era '+correctPctVal+'%'}</span>`}
+        </div>
+        <div style="margin-top:10px;font-size:.8rem;color:rgba(255,255,255,.35)">💡 Waste% = Waste ÷ Consumo Total × 100</div>
+        ${pct_checked ? `
+          <div style="margin-top:12px;background:${pct_correct?'rgba(0,138,94,.15)':'rgba(192,57,43,.1)'};border:1px solid ${pct_correct?'#008A5E':'#C0392B'};border-radius:8px;padding:14px">
+            <div class="card-title">${pct_correct?'✅ Resolução confirmada':'❌ Veja a resolução correta'}</div>
+            ${[
+              {label:'Waste =',         val:`${correctWaste} kg`,  color:'#FF8A7A'},
+              {label:'÷ Consumo Total =',val:`${consumoTotal} kg`, color:'rgba(255,255,255,.6)'},
+              {label:'× 100 =',         val:`<span style="color:#FF8A7A">${correctPctVal}%</span>`, color:'#FFD700'},
+            ].map(row=>`<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.4)">${row.label}</span>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;font-weight:900;color:${row.color}">${row.val}</span>
+            </div>`).join('')}
+          </div>` : ''}
+      </div>`;
+
+    const nextBtn = step >= 2 ? `<button onclick="levelComplete(${lvScore})" class="btn-primary" style="background:${lv.color};margin-top:8px">Próxima Fase →</button>` : '';
+
+    $('playing-inner').innerHTML = `
+      ${lvHeader(lv, step, 2)}
+      <!-- fórmula visual -->
+      <div style="background:rgba(107,63,160,.15);border:1px solid rgba(107,63,160,.3);border-radius:16px;padding:20px;margin-bottom:14px">
+        <div class="card-title" style="color:#B99EDE;margin-bottom:12px">A Fórmula do Waste Total da Planta</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:900">
+          <span style="background:rgba(192,57,43,.2);border:1px solid #C0392B;color:#FF8A7A;border-radius:8px;padding:6px 12px">WASTE</span>
+          <span style="color:rgba(255,255,255,.3);font-size:1.4rem">=</span>
+          <span style="background:rgba(224,112,0,.2);border:1px solid #E07000;color:#FFB566;border-radius:8px;padding:6px 12px">Perda HALB</span>
+          <span style="color:rgba(255,255,255,.3);font-size:1.4rem">+</span>
+          <span style="background:rgba(0,43,73,.3);border:1px solid #002B49;color:#7FC8FF;border-radius:8px;padding:6px 12px">Consumo FERT</span>
+          <span style="color:rgba(255,255,255,.3);font-size:1.4rem">−</span>
+          <span style="background:rgba(0,138,94,.2);border:1px solid #008A5E;color:#5DDBB0;border-radius:8px;padding:6px 12px">Produção FERT</span>
+        </div>
+      </div>
+      <!-- dados -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Dados de Março</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          ${[
+            {label:'Perda HALB',    val:perdaHalb.toLocaleString('pt-BR')+' kg', color:'#FFB566'},
+            {label:'Consumo FERT',  val:consumoFert.toLocaleString('pt-BR')+' kg', color:'#7FC8FF'},
+            {label:'Produção FERT', val:producaoFert.toLocaleString('pt-BR')+' kg', color:'#5DDBB0'},
+          ].map(d=>`<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px">
+            <div style="font-size:.75rem;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">${d.label}</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:900;color:${d.color}">${d.val}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+      ${step1HTML}${step2HTML}${nextBtn}`;
+
+    window.passo2 = () => { step=1; draw(); };
+    window.checkWaste = () => {
+      inp_waste_val = ($('inp-waste').value||'').trim();
+      const val = parseFloat(inp_waste_val.replace(',','.'));
+      if (isNaN(val)) return;
+      const diff = Math.abs(val - correctWaste);
+      const correct = diff <= 1;
+      const pts = correct ? 25 : diff <= 50 ? 10 : 0;
+      waste_correct=correct; waste_checked=true; waste_pts=pts; lvScore+=pts;
+      if (pts>0) showBurst(pts);
+      showToast(correct ? 'Exato! Waste correto!' : pts>0 ? `Quase! O valor era ${correctWaste} kg` : `Resposta: ${correctWaste} kg. Veja a explicação.`, pts>0);
+      draw();
+    };
+    window.checkPct = () => {
+      inp_pct_val = ($('inp-pct').value||'').trim();
+      const val = parseFloat(inp_pct_val.replace(',','.'));
+      if (isNaN(val)) return;
+      const diff = Math.abs(val - correctPctVal);
+      const correct = diff <= .1;
+      const pts = correct ? 25 : diff <= .5 ? 12 : 0;
+      pct_correct=correct; pct_checked=true; pct_pts=pts; lvScore+=pts;
+      if (pts>0) showBurst(pts);
+      showToast(correct ? 'Perfeito! Cálculo exato!' : pts>0 ? `Quase! A resposta era ${correctPctVal}%` : `Resposta: ${correctPctVal}%. Veja a explicação.`, pts>0);
+      step=2; draw();
+    };
+  }
+  draw();
+}
+
+/* ════════════════════════════════
+   LEVEL COMPLETE
+════════════════════════════════ */
+function levelComplete(earned) {
+  calcShow(false);
+  lastEarned = earned;
+  totalScore += earned;
+  levelsCompleted = Math.max(levelsCompleted, currentLevel + 1);
+  const lv = LEVELS[currentLevel];
+  const pctEarned = earned / LEVEL_MAX[currentLevel];
+  const stars = pctEarned >= .9 ? 3 : pctEarned >= .6 ? 2 : 1;
+  $('scr-complete').style.background = `linear-gradient(160deg,#001f3f 0%,${lv.color} 100%)`;
+  $('complete-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3-stars);
+  $('complete-step').textContent = `Fase ${lv.id} Concluída`;
+  $('complete-title').textContent = lv.title;
+  $('complete-earned').textContent = earned;
+  $('complete-total').textContent = totalScore;
+  const btn = $('btn-complete-next');
+  btn.style.color = lv.color;
+  btn.textContent = currentLevel + 1 >= LEVELS.length ? '🏆 Ver Certificado' : 'Próxima Fase →';
+  showScreen('scr-complete');
+}
+
+function nextAfterComplete() {
+  if (currentLevel + 1 >= LEVELS.length) {
+    renderCertificate();
+    showScreen('scr-final');
+  } else {
+    currentLevel++;
+    renderIntro();
+    showScreen('scr-intro');
+  }
+}
+
+/* ════════════════════════════════
+   CERTIFICATE
+════════════════════════════════ */
+function renderCertificate() {
+  const maxScore = LEVEL_MAX.reduce((a,b) => a+b, 0);
+  const pctScore = Math.round((totalScore / maxScore) * 100);
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('pt-BR', {day:'2-digit', month:'long', year:'numeric'});
+  const rank = pctScore >= 90 ? 'Especialista em Balanço de Massa' : pctScore >= 70 ? 'Analista Sênior de Perdas' : pctScore >= 50 ? 'Analista de Controle de Perdas' : 'Participante';
+  const grade = pctScore >= 90 ? 'Excelente' : pctScore >= 70 ? 'Ótimo' : pctScore >= 50 ? 'Bom' : 'Participou';
+
+  $('cert-name').textContent = playerName;
+  $('cert-score').textContent = `${totalScore} pts`;
+  $('cert-score-sub').textContent = `de ${maxScore} possíveis`;
+  $('cert-pct').textContent = `${pctScore}%`;
+  $('cert-grade').textContent = grade;
+  $('cert-rank').textContent = rank;
+  $('cert-date').textContent = dateStr;
+}
+
+async function downloadCert() {
+  const btn = $('btn-download');
+  btn.textContent = '⏳ Gerando PDF...';
+  btn.style.opacity = '.7';
+  btn.disabled = true;
+
+  // Carrega html2canvas e jsPDF separadamente para controle total
+  const loadScript = src => new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+
+  try {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  } catch(e) {
+    alert('Erro ao carregar bibliotecas de PDF. Verifique sua conexão.');
+    btn.textContent = '⬇️ Baixar Certificado (PDF)';
+    btn.style.opacity = '1'; btn.disabled = false;
+    return;
+  }
+
+  // Dimensões A4 landscape em mm e px (96 dpi)
+  const PDF_W_MM = 297, PDF_H_MM = 210;
+  const PDF_W_PX = 1123, PDF_H_PX = 794;
+
+  const el = $('cert-wrap');
+
+  // Salva estilos originais para reverter depois
+  const orig = {
+    width:     el.style.width,
+    minWidth:  el.style.minWidth,
+    maxWidth:  el.style.maxWidth,
+    height:    el.style.height,
+    overflow:  el.style.overflow,
+    boxShadow: el.style.boxShadow,
+    borderRadius: el.style.borderRadius,
+    position:  el.style.position,
+  };
+
+  // Aplica dimensões exatas do A4 landscape
+  Object.assign(el.style, {
+    width:        PDF_W_PX + 'px',
+    minWidth:     PDF_W_PX + 'px',
+    maxWidth:     PDF_W_PX + 'px',
+    height:       PDF_H_PX + 'px',
+    overflow:     'hidden',
+    boxShadow:    'none',
+    borderRadius: '0',
+    position:     'relative',
+  });
+
+  // Aguarda dois frames para o browser repintar
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  try {
+    const canvas = await window.html2canvas(el, {
+      scale:           2,          // 2x → 2246×1588px — nítido para impressão
+      useCORS:         true,
+      backgroundColor: '#ffffff',
+      width:           PDF_W_PX,
+      height:          PDF_H_PX,
+      windowWidth:     PDF_W_PX,
+      windowHeight:    PDF_H_PX,
+      scrollX:         0,
+      scrollY:         0,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+
+    // Adiciona a imagem ocupando 100% da página — sem margens, sem corte
+    doc.addImage(imgData, 'JPEG', 0, 0, PDF_W_MM, PDF_H_MM);
+    doc.save(`Certificado_Amcor_${playerName.replace(/\s+/g, '_')}.pdf`);
+
+  } finally {
+    // Reverte o elemento para o estado original sempre
+    Object.assign(el.style, orig);
+    btn.textContent = '⬇️ Baixar Certificado (PDF)';
+    btn.style.opacity = '1';
+    btn.disabled = false;
+  }
+}
+
+function restartGame() {
+  totalScore = 0; levelsCompleted = 0; currentLevel = 0;
+  $('inp-name').value = '';
+  const btn = $('btn-name-go');
+  btn.style.background = 'rgba(255,255,255,.15)';
+  btn.style.color = 'rgba(255,255,255,.3)';
+  btn.style.boxShadow = 'none';
+  showScreen('scr-name');
+}
+</script>
+</body>
+</html>
